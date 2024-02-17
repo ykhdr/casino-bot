@@ -22,6 +22,7 @@ services:
       DB_NAME: ${POSTGRES_DB}
       DB_USERNAME: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
 
   db:
     image: 'postgres:16-alpine'

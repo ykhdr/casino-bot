@@ -119,7 +119,7 @@ def handle_balance_cmd(message: Message):
 
 
 @bot.message_handler(chat_types=['private'], commands=['topup'],
-                     func=lambda message: message.from_user.username == 'rdhkyy')
+                     func=lambda message: message.from_user.username == os.getenv('ADMIN_USERNAME'))
 def top_up_balance(message: Message):
     chat_id = message.chat.id
     params = message.text.split()[1:]
