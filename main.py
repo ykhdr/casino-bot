@@ -57,6 +57,9 @@ def handle_bet_cmd(message: Message):
 
     username = message.from_user.username
 
+    if not username:
+        username = str(message.from_user.id)
+
     user = get_user(username)
 
     if not user:
@@ -104,8 +107,10 @@ def handle_bet_cmd(message: Message):
 
 @bot.message_handler(chat_types=['group', 'supergroup'], commands=['balance'])
 def handle_balance_cmd(message: Message):
-    chat_id = message.chat.id
     username = message.from_user.username
+
+    if not username:
+        username = message.from_user.id
 
     user = get_user(username)
 
@@ -113,8 +118,6 @@ def handle_balance_cmd(message: Message):
         register(username, message)
         return
 
-        # user_balance = users_balance[username]
-    # bot.reply_to(message, f'Твой баланс: {user_balance}')
     bot.reply_to(message, f'Твой баланс: {user.balance}')
 
 
