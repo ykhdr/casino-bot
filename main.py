@@ -41,6 +41,15 @@ def combination(value):
         return CasinoWinnings.nothing
 
 
+def register(username, message):
+    user = User(username, START_BALANCE)
+    add_user(user)
+
+    # active_users.append(username)
+    # users_balance[username] = START_BALANCE
+    bot.reply_to(message, f'Ты авторизировался, хрш. Твой баланс: {START_BALANCE}.\nТеперь можешь делать ставки')
+
+
 @bot.message_handler(chat_types=['group', 'supergroup'], commands=['bet'])
 def handle_bet_cmd(message: Message):
     chat_id = message.chat.id
@@ -51,12 +60,7 @@ def handle_bet_cmd(message: Message):
     user = get_user(username)
 
     if not user:
-        user = User(username, START_BALANCE)
-        add_user(user)
-
-        # active_users.append(username)
-        # users_balance[username] = START_BALANCE
-        bot.reply_to(message, f'Ты авторизировался, хрш. Твой баланс: {START_BALANCE}.\nТеперь можешь делать ставки')
+        register(username, message)
         return
 
     if not params:
@@ -106,16 +110,60 @@ def handle_balance_cmd(message: Message):
     user = get_user(username)
 
     if not user:
-        user = User(username, START_BALANCE)
-        add_user(user)
-        # active_users.append(username)
-        # users_balance[username] = START_BALANCE
-        bot.reply_to(message, f'Ты авторизировался, хрш. Твой баланс: {START_BALANCE}.\nТеперь можешь делать ставки')
+        register(username, message)
         return
 
-    # user_balance = users_balance[username]
+        # user_balance = users_balance[username]
     # bot.reply_to(message, f'Твой баланс: {user_balance}')
     bot.reply_to(message, f'Твой баланс: {user.balance}')
+
+
+@bot.message_handler(chat_types=['group', 'supergroup'], commands=['donate'])
+def handle_donate_cmd(message: Message):
+    username_from = message.from_user.username
+
+    user_from = get_user(username_from)
+
+    if not user_from:
+        register(username_from, message)
+        return
+
+    params = message.text.split()[1:]
+
+    if len(params) < 2:
+        bot.reply_to(message, 'Укажи ник и сумму которую хочешь закинуть на додеп молодому: /donate username 777')
+        return
+
+    username_to = params[0]
+
+    user_to = get_user(username_to)
+
+    if not user_to:
+        bot.reply_to(message, 'Пользователя с таким ником не существует')
+        return
+
+    if user_from.id == user_to.id:
+        bot.reply_to(message, 'Переводы себе бессмысленны')
+        return
+
+    if not params[1].isdigit() or int(params[1]) <= 0:
+        bot.reply_to(message, 'Сумма для перевода должна быть положительным числом')
+        return
+
+    dep = int(params[1])
+
+    if dep > user_from.balance:
+        bot.reply_to(message, f'Малыш, не дорос ты еще до таких сумм. Твой баланс: {user_from.balance}')
+        return
+
+    new_balance_from = user_from.balance - dep
+    new_balance_to = user_to.balance + dep
+
+    set_balance(user_from, new_balance_from)
+    set_balance(user_to, new_balance_to)
+
+    bot.reply_to(message,
+                 f'Поздравляю, ты дал {user_to.id} возможность еще раз потратить свое баблишко. Твой баланс: {new_balance_from}')
 
 
 @bot.message_handler(chat_types=['private'], commands=['topup'],
