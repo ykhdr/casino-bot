@@ -1,16 +1,22 @@
 import enum
+import logging
 import os
 import time
+import traceback
+from contextlib import closing
 
 import sqlalchemy
 from requests import session
 from sqlalchemy import create_engine
+from sqlalchemy.dialects.postgresql import psycopg2
 
 from telebot import TeleBot
 from telebot.types import Message
 
-from casino_bot.db.entities.entities import User
-from casino_bot.db.requests.users_requests import add_user, get_user, set_balance
+from casino_bot.db.entities.entities import User, Chat
+from casino_bot.db.requests import engine
+from casino_bot.db.requests.chat_requests import add_chat
+from casino_bot.db.requests.users_requests import add_user, get_user, set_balance, get_user_by_username
 
 bot = TeleBot(os.getenv('BOT_TOKEN'))
 
@@ -41,12 +47,14 @@ def combination(value):
         return CasinoWinnings.nothing
 
 
-def register(username, message):
-    user = User(username, START_BALANCE)
+def register(user_id, username, message):
+    chat_id = message.chat.id
+    chat = Chat(chat_id)
+    add_chat(chat)
+
+    user = User(id=user_id, username=username, balance=START_BALANCE, chat_id=chat_id)
     add_user(user)
 
-    # active_users.append(username)
-    # users_balance[username] = START_BALANCE
     bot.reply_to(message, f'Ты авторизировался, хрш. Твой баланс: {START_BALANCE}.\nТеперь можешь делать ставки')
 
 
@@ -56,24 +64,22 @@ def handle_bet_cmd(message: Message):
     params = message.text.split()[1:]
 
     username = message.from_user.username
+    user_id = message.from_user.id
 
-    if not username:
-        username = str(message.from_user.id)
-
-    user = get_user(username)
+    user = get_user(user_id)
 
     if not user:
-        register(username, message)
+        register(user_id, username, message)
         return
 
     if not params:
-        bot.send_message(chat_id, 'Введите сумму для ставки. Пример: /bet 777')
+        bot.reply_to(message, 'Введите сумму для ставки. Пример: /bet 777')
         return
 
     bet_s = params[0]
 
     if not bet_s.isdigit() or int(bet_s) <= 0:
-        bot.send_message(chat_id, 'Ставка должна быть неотрицательным числом')
+        bot.reply_to(message, 'Ставка должна быть неотрицательным числом')
         return
 
     bet = int(bet_s)
@@ -107,15 +113,17 @@ def handle_bet_cmd(message: Message):
 
 @bot.message_handler(chat_types=['group', 'supergroup'], commands=['balance'])
 def handle_balance_cmd(message: Message):
+    chat_id = message.chat.id
     username = message.from_user.username
+    user_id = message.from_user.id
 
-    if not username:
-        username = message.from_user.id
+    # if not username:
+    #     username = str(message.from_user.id)
 
-    user = get_user(username)
+    user = get_user(user_id)
 
     if not user:
-        register(username, message)
+        register(user_id, username, message)
         return
 
     bot.reply_to(message, f'Твой баланс: {user.balance}')
@@ -123,12 +131,14 @@ def handle_balance_cmd(message: Message):
 
 @bot.message_handler(chat_types=['group', 'supergroup'], commands=['donate'])
 def handle_donate_cmd(message: Message):
+    chat_id = message.chat.id
     username_from = message.from_user.username
+    user_id_from = message.from_user.id
 
-    user_from = get_user(username_from)
+    user_from = get_user(user_id_from)
 
     if not user_from:
-        register(username_from, message)
+        register(user_id_from, username_from, message)
         return
 
     params = message.text.split()[1:]
@@ -181,7 +191,7 @@ def top_up_balance(message: Message):
 
     username = params[0]
 
-    user = get_user(username)
+    user = get_user_by_username(username)
 
     if not user:
         bot.send_message(chat_id, 'Такого пользователя нет')
@@ -199,4 +209,28 @@ def top_up_balance(message: Message):
                      f'Баланс пользователя {username} увеличен на {adding}. Текущий баланс: {user.balance}')
 
 
-bot.infinity_polling()
+def migrate_schema():
+    try:
+        with engine.connect() as conn:
+            with closing(conn.connection) as connection:
+                cursor = connection.cursor()
+
+                with open("db/db_init.sql", 'r') as f:
+                    migration_script = f.read()
+                    cursor.execute(migration_script)
+                    connection.commit()
+            return True
+    except:
+        logging.warning('Ошибка при миграции схемы базы данных')
+        traceback.print_exc()
+        return False
+
+
+def main():
+    if not migrate_schema():
+        exit(1)
+    bot.infinity_polling()
+
+
+if __name__ == "__main__":
+    main()

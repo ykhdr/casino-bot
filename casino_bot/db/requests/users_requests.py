@@ -7,26 +7,20 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 from casino_bot.db.entities import Entity
 from casino_bot.db.entities.entities import User
-
-host = os.getenv('HOST')
-dbname = os.getenv('DB_NAME')
-dbuser = os.getenv('DB_USERNAME')
-dbpassw = os.getenv('DB_PASSWORD')
-
-engine = create_engine(f'postgresql://{dbuser}:{dbpassw}@{host}/{dbname}')
-Entity.metadata.create_all(engine)
-
-Session = sessionmaker(bind=engine)
-session = Session()
+from casino_bot.db.requests import session
 
 
-def get_user(username):
+def get_user(user_id):
     try:
-        return session.get(User, username)
+        return session.get(User, user_id)
     except PendingRollbackError:
         logging.warning('rollback error')
         session.rollback()
-        get_user(username)
+        get_user(user_id)
+
+
+def get_user_by_username(username):
+    return session.query(User).filter(User.username == username).first()
 
 
 def add_user(user):
