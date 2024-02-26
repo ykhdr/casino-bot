@@ -1,10 +1,10 @@
 CREATE TABLE IF NOT EXISTS chats (
-    id SERIAL PRIMARY KEY
+    id BIGINT PRIMARY KEY
 );
 
 CREATE TABLE IF NOT EXISTS users (
-  id SERIAL PRIMARY KEY,
+  id BIGINT PRIMARY KEY,
   username varchar,
   balance BIGINT,
-  chat_id INTEGER REFERENCES chats(id)
+  chat_id BIGINT REFERENCES chats(id)
 );

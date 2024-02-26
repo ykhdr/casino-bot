@@ -5,18 +5,13 @@ import time
 import traceback
 from contextlib import closing
 
-import sqlalchemy
-from requests import session
-from sqlalchemy import create_engine
-from sqlalchemy.dialects.postgresql import psycopg2
-
 from telebot import TeleBot
 from telebot.types import Message
 
-from casino_bot.db.entities.entities import User, Chat
+from casino_bot.db.entities.entities import User
 from casino_bot.db.requests import engine
 from casino_bot.db.requests.chat_requests import add_chat
-from casino_bot.db.requests.users_requests import add_user, get_user, set_balance, get_user_by_username
+from casino_bot.db.requests.users_requests import add_user, get_user, set_balance, get_user_by_username, add_balance
 
 bot = TeleBot(os.getenv('BOT_TOKEN'))
 
@@ -49,8 +44,7 @@ def combination(value):
 
 def register(user_id, username, message):
     chat_id = message.chat.id
-    chat = Chat(chat_id)
-    add_chat(chat)
+    add_chat(chat_id)
 
     user = User(id=user_id, username=username, balance=START_BALANCE, chat_id=chat_id)
     add_user(user)
@@ -97,28 +91,22 @@ def handle_bet_cmd(message: Message):
     user_balance -= bet
     cw = combination(value)
 
+    set_balance(user, user_balance)
     if cw == CasinoWinnings.nothing:
-        set_balance(user, user_balance)
-        # users_balance[username] = user_balance
         time.sleep(1.5)
         bot.reply_to(message, f'Упс.. Ты проиграл. Теперь твой баланс: {user_balance}')
     else:
         gain = bet * cw.value
-        user_balance += gain
-        set_balance(user, user_balance)
-        # users_balance[username] = user_balance
+        add_balance(user_id, gain)
+        user = get_user(user_id)
         time.sleep(1.5)
-        bot.reply_to(message, f'Поздравляю! Ты выиграл: {gain}. Теперь твой баланс: {user_balance}')
+        bot.reply_to(message, f'Поздравляю! Ты выиграл: {gain}. Теперь твой баланс: {user.balance}')
 
 
 @bot.message_handler(chat_types=['group', 'supergroup'], commands=['balance'])
 def handle_balance_cmd(message: Message):
-    chat_id = message.chat.id
     username = message.from_user.username
     user_id = message.from_user.id
-
-    # if not username:
-    #     username = str(message.from_user.id)
 
     user = get_user(user_id)
 
@@ -131,7 +119,6 @@ def handle_balance_cmd(message: Message):
 
 @bot.message_handler(chat_types=['group', 'supergroup'], commands=['donate'])
 def handle_donate_cmd(message: Message):
-    chat_id = message.chat.id
     username_from = message.from_user.username
     user_id_from = message.from_user.id
 
@@ -202,7 +189,6 @@ def top_up_balance(message: Message):
 
     adding = int(params[1])
 
-    # users_balance[username] = users_balance[username] + adding
     set_balance(user, user.balance + adding)
 
     bot.send_message(chat_id,
@@ -219,7 +205,7 @@ def migrate_schema():
                     migration_script = f.read()
                     cursor.execute(migration_script)
                     connection.commit()
-            return True
+        return True
     except:
         logging.warning('Ошибка при миграции схемы базы данных')
         traceback.print_exc()
