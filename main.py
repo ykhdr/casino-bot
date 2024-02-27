@@ -136,7 +136,7 @@ def handle_donate_cmd(message: Message):
 
     username_to = params[0]
 
-    user_to = get_user(username_to)
+    user_to = get_user_by_username(username_to)
 
     if not user_to:
         bot.reply_to(message, 'Пользователя с таким ником не существует')
@@ -163,7 +163,7 @@ def handle_donate_cmd(message: Message):
     set_balance(user_to, new_balance_to)
 
     bot.reply_to(message,
-                 f'Поздравляю, ты дал {user_to.id} возможность еще раз потратить свое баблишко. Твой баланс: {new_balance_from}')
+                 f'Поздравляю, ты дал {username_to} возможность еще раз потратить свое баблишко. Твой баланс: {new_balance_from}')
 
 
 @bot.message_handler(chat_types=['private'], commands=['topup'],
